@@ -33,6 +33,9 @@ if __name__ == '__main__':
         # images = decode_latent_images(xm, latent, cameras, rendering_mode=render_mode)
         mesh = decode_latent_mesh(xm=xm, latent=latent)
         mesh = mesh.tri_mesh()
-        mesh.save('example_data/cactus/cactus_reconstructed.obj')
+        with open(
+            'example_data/cactus/cactus_reconstructed.obj', 'w'
+        ) as f:
+            mesh.write_obj(f)
 
 
