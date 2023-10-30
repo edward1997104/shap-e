@@ -3,7 +3,7 @@ import torch
 
 from shap_e.models.download import load_model
 from shap_e.util.data_util import load_or_create_multimodal_batch
-from shap_e.util.notebooks import create_pan_cameras, decode_latent_images, decode_latent_mesh
+from shap_e.util.notebooks import decode_latent_mesh
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
