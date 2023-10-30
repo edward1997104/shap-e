@@ -14,6 +14,7 @@ if __name__ == '__main__':
     xm = load_model('transmitter', device=device)
 
     example_dir = ''
+    output_dir = ''
     model_paths = glob.glob(f'{example_dir}/*/*.obj')
     for model_path in model_paths:
         file_id = os.path.basename(model_path.split('/')[-2])
@@ -24,7 +25,7 @@ if __name__ == '__main__':
             model_path=model_path,
             mv_light_mode="basic",
             mv_image_size=256,
-            cache_dir=f"{example_dir}/{file_id}/cached",
+            cache_dir=f"{output_dir}/cached/{file_id}/",
             verbose=True,  # this will show Blender output during renders
         )
 
@@ -39,7 +40,7 @@ if __name__ == '__main__':
             mesh = decode_latent_mesh(xm=xm, latent=latent)
             mesh = mesh.tri_mesh()
             with open(
-                f'{example_dir}/{file_id}/reconstructed.obj', 'w'
+                f'{output_dir}/reconstructed/{file_id}.obj', 'w'
             ) as f:
                 mesh.write_obj(f)
 
