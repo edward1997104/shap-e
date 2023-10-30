@@ -9,6 +9,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
 if __name__ == '__main__':
+    xm = load_model('transmitter', device=device)
     model_path = "example_data/cactus/object.obj"
 
     # This may take a few minutes, since it requires rendering the model twice
