@@ -1,5 +1,5 @@
 import torch
-
+import os
 from shap_e.diffusion.sample import sample_latents
 from shap_e.diffusion.gaussian_diffusion import diffusion_from_config
 from shap_e.models.download import load_model, load_config
@@ -38,7 +38,11 @@ if __name__ == '__main__':
 
     mesh = decode_latent_mesh(xm=xm, latent=latents[0])
     mesh = mesh.tri_mesh()
+
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir, exist_ok=True)
+
     with open(
-            f'{output_dir}/reconstructed/testing.obj', 'w'
+            f'{output_dir}/testing.obj', 'w'
     ) as f:
         mesh.write_obj(f)
