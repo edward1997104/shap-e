@@ -57,7 +57,7 @@ if __name__ == '__main__':
     guidance_scale = 3.0
 
     ## downloading file from s3 bucket in a tmp folder
-    with tempfile.TemporaryDirectory as tmp_dir:
+    with tempfile.TemporaryDirectory() as tmp_dir:
         for img in img_lists:
 
             cloudpath = cloudpathlib.CloudPath(f's3://gso-renders/{img}')
