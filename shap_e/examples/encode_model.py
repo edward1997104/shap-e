@@ -6,9 +6,31 @@ from shap_e.util.data_util import load_or_create_multimodal_batch
 from shap_e.util.notebooks import decode_latent_mesh
 import glob
 import os
+import trimesh
+import math
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+def rotate_around_axis(mesh, axis = 'x', reverse = False):
+    if reverse:
+        angle = math.pi / 2
+    else:
+        angle = -math.pi / 2
+
+    if axis == 'x':
+        direction = [1, 0, 0]
+    elif axis == 'y':
+        direction = [0, 1, 0]
+    else:
+        direction = [0, 0, 1]
+
+    center = mesh.centroid
+
+    rot_matrix = trimesh.transformations.rotation_matrix(angle, direction, center)
+
+    mesh.apply_transform(rot_matrix)
+
+    return mesh
 
 if __name__ == '__main__':
     xm = load_model('transmitter', device=device)
@@ -39,9 +61,7 @@ if __name__ == '__main__':
             # images = decode_latent_images(xm, latent, cameras, rendering_mode=render_mode)
             mesh = decode_latent_mesh(xm=xm, latent=latent)
             mesh = mesh.tri_mesh()
-            with open(
-                f'{output_dir}/reconstructed/{file_id}.obj', 'w'
-            ) as f:
-                mesh.write_obj(f)
-
+            mesh = trimesh.Trimesh(vertices=mesh.verts, faces=mesh.faces)
+            mesh = rotate_around_axis(mesh, axis='x', reverse=False)
+            mesh.export(f'{output_dir}/reconstructed/{file_id}.obj')
 
