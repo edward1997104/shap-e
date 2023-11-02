@@ -59,12 +59,12 @@ if __name__ == '__main__':
     ## downloading file from s3 bucket in a tmp folder
     with tempfile.TemporaryDirectory() as tmp_dir:
         for img in img_lists:
-
+            print("start processing: ", img)
             cloudpath = cloudpathlib.CloudPath(f's3://gso-renders/{img}')
             id = img.split('/')[-3]
             save_filename = f"{id}.png"
             save_path = os.path.join(tmp_dir, save_filename)
-            cloudpath.download(save_path)
+            cloudpath.download_to(save_path)
 
 
 
