@@ -106,7 +106,7 @@ if __name__ == '__main__':
 
     for worker_i in range(args.workers):
         process = multiprocessing.Process(
-            target=worker, args=(queue, count)
+            target=worker, args=(queue, count, worker_i)
         )
         process.daemon = True
         process.start()
