@@ -99,6 +99,9 @@ if __name__ == '__main__':
     model_paths = glob.glob(f'{input_dir}/*.obj')
     print(f'Found {len(model_paths)} models')
 
+    os.makedirs(f'{args.output_dir}/cached/', exist_ok=True)
+    os.makedirs(f'{args.output_dir}/reconstructed/', exist_ok=True)
+
     queue = multiprocessing.JoinableQueue()
     count = multiprocessing.Value("i", 0)
 
