@@ -69,7 +69,7 @@ def process_one(model_path, cuda_id):
     xm = load_model('transmitter', device=device)
 
 
-    file_id = os.path.basename(model_path.split('/')[-2])
+    file_id = os.path.basename(model_path)[:-4]
     print("Processing", file_id)
     # This may take a few minutes, since it requires rendering the model twice
     # in two different modes.
