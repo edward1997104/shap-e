@@ -69,6 +69,7 @@ def process_one(model_path, cuda_id):
 
 
     file_id = os.path.basename(model_path.split('/')[-2])
+    print("Processing", file_id)
     # This may take a few minutes, since it requires rendering the model twice
     # in two different modes.
     batch = load_or_create_multimodal_batch(
@@ -87,6 +88,7 @@ def process_one(model_path, cuda_id):
         mesh = trimesh.Trimesh(vertices=mesh.verts, faces=mesh.faces)
         mesh = rotate_around_axis(mesh, axis='x', reverse=False)
         mesh.export(f'{args.output_dir}/reconstructed/{file_id}.obj')
+        print(f"Saved {args.output_dir}/reconstructed/{file_id}.obj")
 
 
 
