@@ -18,6 +18,7 @@ class Args:
     input_dir : str
     output_dir : str
     workers : int
+    blender_path : str = '/home/ubuntu/blender-3.3.1-linux-x64/blender'
 
 args = tyro.cli(Args)
 
@@ -62,6 +63,7 @@ def process_one(model_path, cuda_id):
     torch.cuda.set_device(f'cuda:{cuda_id}')
     device = torch.device(f'cuda:{cuda_id}')
     os.environ['CUDA_VISIBLE_DEVICES'] = str(cuda_id)
+    os.environ['BLENDER_PATH'] = args.blender_path
 
     xm = load_model('transmitter', device=device)
 
