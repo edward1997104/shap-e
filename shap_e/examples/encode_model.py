@@ -95,7 +95,7 @@ def process_one(model_path, cuda_id):
 
 
 if __name__ == '__main__':
-    model_paths = glob.glob(f'{input_dir}/*.obj')
+    model_paths = glob.glob(f'{args.input_dir}/*.obj')
     print(f'Found {len(model_paths)} models')
 
     os.makedirs(f'{args.output_dir}/cached/', exist_ok=True)
