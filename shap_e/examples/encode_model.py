@@ -18,6 +18,7 @@ class Args:
     input_dir : str
     output_dir : str
     workers : int
+    cuda_cnt : int
     blender_path : str = '/home/ubuntu/blender-3.3.1-linux-x64/blender'
 
 args = tyro.cli(Args)
@@ -33,7 +34,7 @@ def worker(
         if item is None:
             break
         try:
-            process_one(item, worker_idx)
+            process_one(item, worker_idx % args.cuda_cnt)
         except Exception as e:
             print(e)
         queue.task_done()
