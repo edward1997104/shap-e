@@ -95,9 +95,6 @@ def process_one(model_path, cuda_id):
 
 
 if __name__ == '__main__':
-    xm = load_model('transmitter', device=device)
-
-
     model_paths = glob.glob(f'{input_dir}/*.obj')
     print(f'Found {len(model_paths)} models')
 
