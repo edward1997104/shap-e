@@ -8,9 +8,36 @@ import glob
 import os
 import trimesh
 import math
+import tyro
+from dataclasses import dataclass
+import multiprocessing
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+@dataclass
+class Args:
+    input_dir : str
+    output_dir : str
+    workers : int
+
+args = tyro.cli(Args)
+
+def worker(
+    queue: multiprocessing.JoinableQueue,
+    count: multiprocessing.Value,
+    worker_idx : int
+) -> None:
+
+    while True:
+        item = queue.get()
+        if item is None:
+            break
+        try:
+            process_one(item, worker_idx)
+        except Exception as e:
+            print(e)
+        queue.task_done()
+        with count.get_lock():
+            count.value += 1
 def rotate_around_axis(mesh, axis = 'x', reverse = False):
     if reverse:
         angle = math.pi / 2
@@ -31,37 +58,65 @@ def rotate_around_axis(mesh, axis = 'x', reverse = False):
     mesh.apply_transform(rot_matrix)
 
     return mesh
+def process_one(model_path, cuda_id):
+    torch.cuda.set_device(f'cuda:{cuda_id}')
+    device = torch.device(f'cuda:{cuda_id}')
+    os.environ['CUDA_VISIBLE_DEVICES'] = str(cuda_id)
+
+    xm = load_model('transmitter', device=device)
+
+
+    file_id = os.path.basename(model_path.split('/')[-2])
+    # This may take a few minutes, since it requires rendering the model twice
+    # in two different modes.
+    batch = load_or_create_multimodal_batch(
+        device,
+        model_path=model_path,
+        mv_light_mode="basic",
+        mv_image_size=256,
+        cache_dir=f"{args.output_dir}/cached/{file_id}/",
+        verbose=True,  # this will show Blender output during renders
+    )
+
+    with torch.no_grad():
+        latent = xm.encoder.encode_to_bottleneck(batch)
+        mesh = decode_latent_mesh(xm=xm, latent=latent)
+        mesh = mesh.tri_mesh()
+        mesh = trimesh.Trimesh(vertices=mesh.verts, faces=mesh.faces)
+        mesh = rotate_around_axis(mesh, axis='x', reverse=False)
+        mesh.export(f'{args.output_dir}/reconstructed/{file_id}.obj')
+
+
+
+
 
 if __name__ == '__main__':
     xm = load_model('transmitter', device=device)
 
-    example_dir = ''
-    output_dir = ''
-    model_paths = glob.glob(f'{example_dir}/*/*.obj')
-    for model_path in model_paths:
-        file_id = os.path.basename(model_path.split('/')[-2])
-        # This may take a few minutes, since it requires rendering the model twice
-        # in two different modes.
-        batch = load_or_create_multimodal_batch(
-            device,
-            model_path=model_path,
-            mv_light_mode="basic",
-            mv_image_size=256,
-            cache_dir=f"{output_dir}/cached/{file_id}/",
-            verbose=True,  # this will show Blender output during renders
+
+    model_paths = glob.glob(f'{input_dir}/*.obj')
+    print(f'Found {len(model_paths)} models')
+
+    queue = multiprocessing.JoinableQueue()
+    count = multiprocessing.Value("i", 0)
+
+    for worker_i in range(args.workers):
+        process = multiprocessing.Process(
+            target=worker, args=(queue, count)
         )
+        process.daemon = True
+        process.start()
 
-        with torch.no_grad():
-            latent = xm.encoder.encode_to_bottleneck(batch)
+    for model_path in model_paths:
+        queue.put(model_path)
 
-            render_mode = 'stf'  # you can change this to 'nerf'
-            size = 128  # recommended that you lower resolution when using nerf
+    queue.join()
 
-            # cameras = create_pan_cameras(size, device)
-            # images = decode_latent_images(xm, latent, cameras, rendering_mode=render_mode)
-            mesh = decode_latent_mesh(xm=xm, latent=latent)
-            mesh = mesh.tri_mesh()
-            mesh = trimesh.Trimesh(vertices=mesh.verts, faces=mesh.faces)
-            mesh = rotate_around_axis(mesh, axis='x', reverse=False)
-            mesh.export(f'{output_dir}/reconstructed/{file_id}.obj')
+    for _ in range(args.workers):
+        queue.put(None)
+
+    print(f'Processed {count.value} models')
+
+
+
 
