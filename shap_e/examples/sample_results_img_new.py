@@ -14,7 +14,7 @@ import pickle
 import tyro
 from dataclasses import dataclass
 import multiprocessing
-torch.multiprocessing.set_spawn_method('spawn', force=True)
+torch.multiprocessing.set_start_method('spawn', force=True)
 
 
 @dataclass
