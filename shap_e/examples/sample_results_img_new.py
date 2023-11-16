@@ -13,10 +13,18 @@ import tempfile
 import pickle
 import tyro
 from dataclasses import dataclass
+import multiprocessing
+torch.multiprocessing.set_spawn_method('spawn', force=True)
+
 
 @dataclass
 class Args:
+    workers : int = 8
+    cuda_cnt : int = 8
     render_resolution : int = 384
+    output_dir : str = 'shape-mesh-output-val'
+    batch_size : int  = 1
+    guidance_scale : float = 3.0
 
 args = tyro.cli(Args)
 
@@ -67,9 +75,77 @@ img_bucket_mapping = {
             f'3DFuture_renders_{args.render_resolution}': '3dfuture-renders',
         }
 
+def process_one(xm, model, diffusion, img):
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        dataset, id = img
+        obj_path = f'{args.output_dir}/{id}.obj'
+        if os.path.exists(obj_path):
+            print("File exists: ", obj_path)
+            return
+
+        dataset = dataset.replace("_wavelet_latents", f'_renders_{args.render_resolution}').replace("_fixed", "")
+        bucket = img_bucket_mapping[dataset]
+        print("start processing: ", img)
+
+        cloudpath = cloudpathlib.CloudPath(f's3://{bucket}/{id}/img/018.png')
+        save_filename = f"{id}.png"
+        save_path = os.path.join(tmp_dir, save_filename)
+        cloudpath.download_to(save_path)
+
+        # To get the best result, you should remove the background and show only the object of interest to the model.
+        image = load_image(save_path)
+
+        latents = sample_latents(
+            batch_size=batch_size,
+            model=model,
+            diffusion=diffusion,
+            guidance_scale=guidance_scale,
+            model_kwargs=dict(images=[image] * batch_size),
+            progress=True,
+            clip_denoised=True,
+            use_fp16=True,
+            use_karras=True,
+            karras_steps=64,
+            sigma_min=1e-3,
+            sigma_max=160,
+            s_churn=0,
+        )
+
+        mesh = decode_latent_mesh(xm=xm, latent=latents[0])
+        mesh = mesh.tri_mesh()
+        mesh = trimesh.Trimesh(vertices=mesh.verts, faces=mesh.faces)
+        mesh = rotate_around_axis(mesh, axis='x', reverse=False)
+
+        mesh.export()
+        print("Saved: ", f'{args.output_dir}/{id}.obj')
+
+
+def worker(queue, count, worker_i):
+
+    cuda_id = worker_i % args.cuda_cnt
+    # torch.cuda.set_device(f'cuda:{cuda_id}')
+    device = torch.device(f'cuda:{cuda_id}')
+    os.environ['CUDA_VISIBLE_DEVICES'] = str(cuda_id)
+
+    xm = load_model('transmitter', device=device)
+    model = load_model('image300M', device=device)
+    diffusion = diffusion_from_config(load_config('diffusion'))
+
+    while True:
+        item = queue.get()
+        if item is None:
+            break
+        try:
+            process_one(xm, model, diffusion, item)
+        except Exception as e:
+            print(e)
+        queue.task_done()
+        with count.get_lock():
+            count.value += 1
+
 if __name__ == '__main__':
-    output_dir = 'shape-mesh-output-val'
-    os.makedirs(output_dir, exist_ok=True)
+    os.makedirs(args.output_dir, exist_ok=True)
 
     file_path_pickle = 'file_paths.pkl'
     with open(file_path_pickle, 'rb') as f:
@@ -80,50 +156,26 @@ if __name__ == '__main__':
     xm = load_model('transmitter', device=device)
     model = load_model('image300M', device=device)
     diffusion = diffusion_from_config(load_config('diffusion'))
-    batch_size = 1
-    guidance_scale = 3.0
 
-    ## downloading file from s3 bucket in a tmp folder
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        for img in img_lists:
-            dataset, id = img
-            dataset = dataset.replace("_wavelet_latents", f'_renders_{args.render_resolution}')
-            bucket = img_bucket_mapping[dataset]
-            print("start processing: ", img)
-            cloudpath = cloudpathlib.CloudPath(f's3://{bucket}/{id}/img/018.png')
-            save_filename = f"{id}.png"
-            save_path = os.path.join(tmp_dir, save_filename)
-            cloudpath.download_to(save_path)
+    queue = multiprocessing.JoinableQueue()
+    count = multiprocessing.Value("i", 0)
+
+    for worker_i in range(args.workers):
+        process = multiprocessing.Process(
+            target=worker, args=(queue, count, worker_i)
+        )
+        # process.daemon = True
+        process.start()
+
+    for img in img_lists:
+        queue.put(img)
+
+    queue.join()
+
+    for _ in range(args.workers):
+        queue.put(None)
+
+    print("Processing finished!")
 
 
-
-            # To get the best result, you should remove the background and show only the object of interest to the model.
-            image = load_image(save_path)
-
-            latents = sample_latents(
-                batch_size=batch_size,
-                model=model,
-                diffusion=diffusion,
-                guidance_scale=guidance_scale,
-                model_kwargs=dict(images=[image] * batch_size),
-                progress=True,
-                clip_denoised=True,
-                use_fp16=True,
-                use_karras=True,
-                karras_steps=64,
-                sigma_min=1e-3,
-                sigma_max=160,
-                s_churn=0,
-            )
-
-            mesh = decode_latent_mesh(xm=xm, latent=latents[0])
-            mesh = mesh.tri_mesh()
-            mesh = trimesh.Trimesh(vertices=mesh.verts, faces=mesh.faces)
-            mesh = rotate_around_axis(mesh, axis = 'x', reverse = False)
-
-            if not os.path.exists(output_dir):
-                os.makedirs(output_dir, exist_ok=True)
-
-            mesh.export(f'{output_dir}/{id}.obj')
-            print("Saved: ", f'{output_dir}/{id}.obj')
 
