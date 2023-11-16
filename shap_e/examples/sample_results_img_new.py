@@ -115,8 +115,8 @@ def process_one(xm, model, diffusion, img):
         mesh = trimesh.Trimesh(vertices=mesh.verts, faces=mesh.faces)
         mesh = rotate_around_axis(mesh, axis='x', reverse=False)
 
-        mesh.export()
-        print("Saved: ", f'{args.output_dir}/{id}.obj')
+        mesh.export(obj_path)
+        print("Saved: ", obj_path)
 
 
 def worker(queue, count, worker_i):
