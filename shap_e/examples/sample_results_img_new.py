@@ -97,11 +97,11 @@ def process_one(xm, model, diffusion, img):
         image = load_image(save_path)
 
         latents = sample_latents(
-            batch_size=batch_size,
+            batch_size=args.batch_size,
             model=model,
             diffusion=diffusion,
-            guidance_scale=guidance_scale,
-            model_kwargs=dict(images=[image] * batch_size),
+            guidance_scale=args.guidance_scale,
+            model_kwargs=dict(images=[image] * args.batch_size),
             progress=True,
             clip_denoised=True,
             use_fp16=True,
