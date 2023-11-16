@@ -28,8 +28,6 @@ class Args:
 
 args = tyro.cli(Args)
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
 def rotate_around_axis(mesh, axis = 'x', reverse = False):
     if reverse:
         angle = math.pi / 2
@@ -124,9 +122,9 @@ def process_one(xm, model, diffusion, img):
 def worker(queue, count, worker_i):
 
     cuda_id = worker_i % args.cuda_cnt
-    # torch.cuda.set_device(f'cuda:{cuda_id}')
+    torch.cuda.set_device(f'cuda:{cuda_id}')
     device = torch.device(f'cuda:{cuda_id}')
-    os.environ['CUDA_VISIBLE_DEVICES'] = str(cuda_id)
+    # os.environ['CUDA_VISIBLE_DEVICES'] = str(cuda_id)
 
     xm = load_model('transmitter', device=device)
     model = load_model('image300M', device=device)
@@ -152,10 +150,6 @@ if __name__ == '__main__':
         img_lists = pickle.load(f)
 
     print("Number of images: ", len(img_lists))
-
-    xm = load_model('transmitter', device=device)
-    model = load_model('image300M', device=device)
-    diffusion = diffusion_from_config(load_config('diffusion'))
 
     queue = multiprocessing.JoinableQueue()
     count = multiprocessing.Value("i", 0)
